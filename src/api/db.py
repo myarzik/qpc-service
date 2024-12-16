@@ -1,5 +1,11 @@
 import sqlite3
 
+
+class TeamNotFoundError(Exception):
+    """Team not found."""
+    pass
+
+
 class Database:
     def __init__(self):
         self.connection = sqlite3.connect('database.db')
@@ -50,23 +56,102 @@ class Database:
         )
         """)
 
-    def update_cities(self, city_id, city_title, map_type):
+    def create_team(self, name, captain_name, email, phone, city_id, telegram_group_id):
         with self.connection as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO cities (id, title, map_type)
-            VALUES (?, ?, ?)
-            """, (city_id, city_title, map_type))
-
-    def update_games(self, game_id, title, description, datetime, price, city_id):
-        with self.connection as conn:
-            conn.execute("""
-            INSERT OR REPLACE INTO games (id, title, description, datetime, price, city_id)
+            INSERT INTO teams (name, captain_name, email, phone, city_id, telegram_group_id)
             VALUES (?, ?, ?, ?, ?, ?)
-            """, (game_id, title, description, datetime, price, city_id))
+            """, (name, captain_name, email, phone, city_id, telegram_group_id))
+            print(f"Team '{name}' created successfully!")
 
-    def update_teams(self, team_id, name, captain_name, email, phone, city_id, telegram_group_id):
+    def read_team(self, team_id):
+        self.cursor.execute("""
+        SELECT * FROM teams WHERE id = ?
+        """, (team_id,))
+        team = self.cursor.fetchone()
+        if not team:
+            raise TeamNotFoundError(f"Team with ID {team_id} not found.")
+        return {
+            "id": team[0],
+            "name": team[1],
+            "captain_name": team[2],
+            "email": team[3],
+            "phone": team[4],
+            "city_id": team[5],
+            "telegram_group_id": team[6]
+        }
+
+    def update_team(self, team_id, name=None, captain_name=None, email=None, phone=None, city_id=None, telegram_group_id=None):
+        team = self.read_team(team_id)
+
+        updated_values = {
+            "name": name if name else team["name"],
+            "captain_name": captain_name if captain_name else team["captain_name"],
+            "email": email if email else team["email"],
+            "phone": phone if phone else team["phone"],
+            "city_id": city_id if city_id else team["city_id"],
+            "telegram_group_id": telegram_group_id if telegram_group_id else team["telegram_group_id"]
+        }
+
         with self.connection as conn:
             conn.execute("""
-            INSERT OR REPLACE INTO teams (id, name, captain_name, email, phone, city_id, telegram_group_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (team_id, name, captain_name, email, phone, city_id, telegram_group_id))
+            UPDATE teams
+            SET name = ?, captain_name = ?, email = ?, phone = ?, city_id = ?, telegram_group_id = ?
+            WHERE id = ?
+            """, (updated_values["name"], updated_values["captain_name"], updated_values["email"],
+                  updated_values["phone"], updated_values["city_id"], updated_values["telegram_group_id"], team_id))
+            print(f"Team with ID {team_id} updated successfully!")
+
+    def delete_team(self, team_id):
+        if not self.read_team(team_id):
+            raise TeamNotFoundError(f"Team with ID {team_id} not found.")
+        with self.connection as conn:
+            conn.execute("""
+            DELETE FROM teams WHERE id = ?
+            """, (team_id,))
+            print(f"Team with ID {team_id} deleted successfully!")
+
+    def list_teams(self):
+        self.cursor.execute("""
+        SELECT * FROM teams
+        """)
+        teams = self.cursor.fetchall()
+        return [
+            {
+                "id": team[0],
+                "name": team[1],
+                "captain_name": team[2],
+                "email": team[3],
+                "phone": team[4],
+                "city_id": team[5],
+                "telegram_group_id": team[6]
+            }
+            for team in teams
+        ]
+
+if __name__ == "__main__":
+    with Database() as db:
+        db.create_team("Team Alpha", "Alice", "alice@example.com", "+1234567890", 1, "telegram-group-123")
+
+        try:
+            team = db.read_team(1)
+            print("Read Team:", team)
+        except TeamNotFoundError as e:
+            print(e)
+
+        try:
+            db.read_team(999)
+        except TeamNotFoundError as e:
+            print(e)
+
+        try:
+            db.delete_team(999)
+        except TeamNotFoundError as e:
+            print(e)
+
+        try:
+            db.update_team(1, captain_name="Alice Smith", email="newalice@example.com")
+            updated_team = db.read_team(1)
+            print("Updated Team:", updated_team)
+        except TeamNotFoundError as e:
+            print(e)
