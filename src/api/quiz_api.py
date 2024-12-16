@@ -16,3 +16,10 @@ class QuizAPI:
     def cities(self):
         endpoint = '/api/city'
         return self._get_request(endpoint=endpoint)
+
+    def games(self, city_id):
+        endpoint = '/api/game'
+        parameters = {
+            'city_id': city_id
+        }
+        return self._get_request(endpoint=endpoint, parameters=parameters)
